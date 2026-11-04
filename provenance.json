@@ -1,0 +1,59 @@
+{
+  "source": "H&M Personalized Fashion Recommendations (Kaggle, 2022)",
+  "source_url": "https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data",
+  "license": "Subject to Competition Rules",
+  "source_transactions": 31788324,
+  "source_columns": [
+    "t_dat",
+    "customer_id",
+    "article_id",
+    "price",
+    "sales_channel_id"
+  ],
+  "source_min_date": "2018-09-20",
+  "source_max_date": "2020-09-22",
+  "window_start": "2020-03-23",
+  "reference_date": "2020-09-22",
+  "months": 6,
+  "seed": 42,
+  "eligible_customers": 746682,
+  "initial_customers": 1000,
+  "candidate_limit": 3000,
+  "selection_checks": [
+    {
+      "customers": 1000,
+      "transactions": 11153,
+      "missing_age": 3,
+      "populated_segments": 5
+    }
+  ],
+  "selection_note": "고객 ID 정렬 후 고정 난수 순열. 같은 목록을 확장해 최소 요건 충족. 거래행은 잘라내지 않음.",
+  "transactions": 11153,
+  "customers": 1000,
+  "products": 6055,
+  "images": 6047,
+  "image_match_pct": 99.86787778695293,
+  "missing_image_ids": [
+    "0179208001",
+    "0212629004",
+    "0408875001",
+    "0537732001",
+    "0610776001",
+    "0610776002",
+    "0778064045",
+    "0863646002"
+  ],
+  "unreadable_images": [],
+  "image_shape": [
+    64,
+    64,
+    3
+  ],
+  "image_dtype": "uint8",
+  "image_sampling": "NumPy의 균등 좌표 인덱싱; 원본 이미지가 아닌 축소 배열의 통계를 분석",
+  "frequency_definition": "고객별 서로 다른 구매 날짜 수; 정확한 주문/방문 횟수가 아님",
+  "monetary_definition": "원본 거래행 price 합; 통화 환산하지 않음",
+  "numpy_version": "2.3.5",
+  "pandas_version": "2.2.3",
+  "data_bytes": 28749019
+}
