@@ -46,6 +46,9 @@ class DataAnalyzer:
             raise ValueError("거래의 필수 값이 누락되었습니다. 원본을 확인하세요.")
         if not np.isfinite(tx.price).all() or (tx.price < 0).any():
             raise ValueError("음수 또는 비유한 가격이 있습니다. 거래 의미를 먼저 확인하세요.")
+        # 원본 거래행의 price를 분석용 거래금액으로 대응시킵니다.
+        # 수량이나 주문 총액을 추정하지 않으며 원본 price는 그대로 보존합니다.
+        tx["amount"] = tx["price"]
         if self.articles.article_id.duplicated().any() or self.customers.customer_id.duplicated().any():
             raise ValueError("상품/고객 테이블의 ID가 중복됩니다.")
         if not tx.article_id.isin(self.articles.article_id).all():
@@ -139,9 +142,13 @@ class DataAnalyzer:
                                "rate": float(mask.mean())}
         return self.df.loc[mask].copy()
 
-    def calculate_rfm(self, customer_col="customer_id", date_col="order_date", amount_col="price",
+    def calculate_rfm(self, customer_col="customer_id", date_col="order_date", amount_col="amount",
                       reference_date=None, frame=None):
-        """F는 서로 다른 구매일 수, M은 원본 거래행 가격의 합입니다."""
+        """F는 서로 다른 구매일 수, M은 지정한 거래금액 컬럼의 합입니다.
+
+        기본 amount는 load_data()에서 원본 price와 같은 값으로 생성합니다.
+        다른 거래 데이터는 frame과 amount_col 인자로 지정할 수 있습니다.
+        """
         data = self.df if frame is None else frame
         data = data[[customer_col, date_col, amount_col]].copy()
         data[date_col] = pd.to_datetime(data[date_col], errors="raise").dt.normalize()
