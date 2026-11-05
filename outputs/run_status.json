@@ -1,0 +1,183 @@
+{
+  "status": "completed",
+  "files_written": [
+    "00_environment.txt",
+    "01_age_summary_before.csv",
+    "01_data_info.txt",
+    "01_load_notes.md",
+    "01_loaded_transactions.csv",
+    "01_price_summary.csv",
+    "02_age_imputation.csv",
+    "02_customers_cleaned.csv",
+    "02_featured_transactions.csv",
+    "02_features_notes.md",
+    "02_image_features.csv",
+    "03_cleaned_transactions.csv",
+    "03_iqr_bounds.csv",
+    "03_iqr_notes.md",
+    "03_outlier_rows.csv",
+    "03_preprocessing_log.csv",
+    "04_statistics_notes.md",
+    "04_summary_statistics.csv",
+    "05_customer_rfm.csv",
+    "05_rfm_notes.md",
+    "05_segment_summary.csv",
+    "06_01_price_histogram.md",
+    "06_01_price_histogram.png",
+    "06_02_price_boxplot.md",
+    "06_02_price_boxplot.png",
+    "06_03_segment_counts.md",
+    "06_03_segment_counts.png",
+    "06_04_rfm_correlation.md",
+    "06_04_rfm_correlation.png",
+    "06_05_frequency_monetary.md",
+    "06_05_frequency_monetary.png",
+    "06_06_monthly_amount.md",
+    "06_06_monthly_amount.png",
+    "06_monthly_amount.csv",
+    "06_rfm_correlations.csv",
+    "07_analysis_report.md"
+  ],
+  "files": {
+    "00_environment.txt": {
+      "kind": "text"
+    },
+    "01_age_summary_before.csv": {
+      "kind": "csv",
+      "rows": 8,
+      "columns": 2
+    },
+    "01_data_info.txt": {
+      "kind": "text"
+    },
+    "01_load_notes.md": {
+      "kind": "text"
+    },
+    "01_loaded_transactions.csv": {
+      "kind": "csv",
+      "rows": 11153,
+      "columns": 12
+    },
+    "01_price_summary.csv": {
+      "kind": "csv",
+      "rows": 8,
+      "columns": 2
+    },
+    "02_age_imputation.csv": {
+      "kind": "csv",
+      "rows": 3,
+      "columns": 4
+    },
+    "02_customers_cleaned.csv": {
+      "kind": "csv",
+      "rows": 1000,
+      "columns": 3
+    },
+    "02_featured_transactions.csv": {
+      "kind": "csv",
+      "rows": 11153,
+      "columns": 16
+    },
+    "02_features_notes.md": {
+      "kind": "text"
+    },
+    "02_image_features.csv": {
+      "kind": "csv",
+      "rows": 6047,
+      "columns": 3
+    },
+    "03_cleaned_transactions.csv": {
+      "kind": "csv",
+      "rows": 11153,
+      "columns": 18
+    },
+    "03_iqr_bounds.csv": {
+      "kind": "csv",
+      "rows": 1,
+      "columns": 9
+    },
+    "03_iqr_notes.md": {
+      "kind": "text"
+    },
+    "03_outlier_rows.csv": {
+      "kind": "csv",
+      "rows": 535,
+      "columns": 19
+    },
+    "03_preprocessing_log.csv": {
+      "kind": "csv",
+      "rows": 4,
+      "columns": 5
+    },
+    "04_statistics_notes.md": {
+      "kind": "text"
+    },
+    "04_summary_statistics.csv": {
+      "kind": "csv",
+      "rows": 8,
+      "columns": 6
+    },
+    "05_customer_rfm.csv": {
+      "kind": "csv",
+      "rows": 1000,
+      "columns": 8
+    },
+    "05_rfm_notes.md": {
+      "kind": "text"
+    },
+    "05_segment_summary.csv": {
+      "kind": "csv",
+      "rows": 5,
+      "columns": 8
+    },
+    "06_01_price_histogram.md": {
+      "kind": "text"
+    },
+    "06_01_price_histogram.png": {
+      "kind": "figure"
+    },
+    "06_02_price_boxplot.md": {
+      "kind": "text"
+    },
+    "06_02_price_boxplot.png": {
+      "kind": "figure"
+    },
+    "06_03_segment_counts.md": {
+      "kind": "text"
+    },
+    "06_03_segment_counts.png": {
+      "kind": "figure"
+    },
+    "06_04_rfm_correlation.md": {
+      "kind": "text"
+    },
+    "06_04_rfm_correlation.png": {
+      "kind": "figure"
+    },
+    "06_05_frequency_monetary.md": {
+      "kind": "text"
+    },
+    "06_05_frequency_monetary.png": {
+      "kind": "figure"
+    },
+    "06_06_monthly_amount.md": {
+      "kind": "text"
+    },
+    "06_06_monthly_amount.png": {
+      "kind": "figure"
+    },
+    "06_monthly_amount.csv": {
+      "kind": "csv",
+      "rows": 7,
+      "columns": 4
+    },
+    "06_rfm_correlations.csv": {
+      "kind": "csv",
+      "rows": 3,
+      "columns": 4
+    },
+    "07_analysis_report.md": {
+      "kind": "text"
+    }
+  }
+}

@@ -4,6 +4,7 @@
 """
 from pathlib import Path
 import json
+import tempfile
 
 import numpy as np
 import pandas as pd
@@ -198,3 +199,134 @@ class DataAnalyzer:
                   "image_mean / product": self.image_features.image_mean,
                   "image_std / product": self.image_features.image_std}
         return pd.DataFrame({name: values.describe() for name, values in series.items()})
+
+
+class AnalysisOutputs:
+    """단계별 결과를 같은 파일명으로 덮어쓰고 이번 실행의 저장 상태를 기록합니다.
+
+    새 인스턴스는 현재 실행의 목록만 초기화합니다. 이전 실행의 파일은
+    삭제하지 않으며, 이번 실행에서 저장한 파일만 목록에 포함합니다.
+    """
+
+    RESERVED_NAMES = {"readme.md", "run_status.json"}
+
+    def __init__(self, output_dir):
+        self.output_dir = Path(output_dir).expanduser().resolve()
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.files = {}
+        self.status = "running"
+        self._write_index()
+
+    def _target(self, filename):
+        name = str(filename)
+        if (not name or name in {".", ".."} or Path(name).name != name
+                or any(char in name for char in "/\\:\r\n")):
+            raise ValueError("결과 파일명에는 폴더 경로를 넣지 마세요.")
+        if name.casefold() in self.RESERVED_NAMES:
+            raise ValueError("README.md와 run_status.json은 저장 상태 기록용 파일입니다.")
+        target = self.output_dir / name
+        if target.is_symlink():
+            raise ValueError("심볼릭 링크를 결과 파일로 덮어쓸 수 없습니다.")
+        return target
+
+    def _temporary_path(self, target):
+        with tempfile.NamedTemporaryFile(
+                dir=self.output_dir, prefix="." + target.name + ".",
+                suffix=".tmp", delete=False) as temporary:
+            return Path(temporary.name)
+
+    def _atomic_text(self, target, text):
+        temporary = self._temporary_path(target)
+        try:
+            temporary.write_text(text, encoding="utf-8")
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def _write_index(self):
+        ordered = dict(sorted(self.files.items()))
+        state = {"status": self.status, "files_written": list(ordered), "files": ordered}
+        self._atomic_text(
+            self.output_dir / "run_status.json",
+            json.dumps(state, ensure_ascii=False, indent=2) + "\n")
+        label = "완료" if self.status == "completed" else "진행 중 또는 미완료"
+        lines = [
+            "# 단계별 분석 결과", "",
+            f"현재 실행 상태: **{label}** (`{self.status}`)", "",
+            f"이번 실행에서 저장한 파일: **{len(ordered)}개**", "",
+            "같은 단계는 항상 같은 파일명으로 저장하므로 다시 실행하면 해당 파일을 덮어씁니다.",
+            "아래 목록에 없는 기존 파일은 이번 실행에서 갱신되지 않았습니다. 이전 실행의 파일이 남아 있을 수 있으며 자동으로 삭제하지 않습니다.",
+            "분석이 중단되면 상태는 `running`으로 남습니다. 최종 결과를 확인할 때는 노트북을 처음부터 끝까지 실행하고 `completed`인지 확인하세요.", "",
+            "CSV는 UTF-8 BOM 형식입니다. 고객·상품 ID의 앞자리 0을 유지하려면 CSV를 다시 읽거나 스프레드시트로 가져올 때 ID 컬럼을 문자열로 지정하세요.", "",
+            "행·열 수는 저장된 CSV 기준이며, 이름 있는 인덱스를 저장한 경우 해당 인덱스도 열 수에 포함합니다.", "",
+            "| 파일 | 종류 | 행 수 | 열 수 |",
+            "|---|---|---:|---:|",
+        ]
+        kinds = {"csv": "표", "text": "설명·기록", "figure": "그래프"}
+        for name, details in ordered.items():
+            lines.append(
+                f"| [{name}]({name}) | {kinds[details['kind']]} | "
+                f"{details.get('rows', '—')} | {details.get('columns', '—')} |")
+        if not ordered:
+            lines.append("| 아직 저장된 단계 결과가 없습니다. | — | — | — |")
+        self._atomic_text(self.output_dir / "README.md", "\n".join(lines) + "\n")
+
+    def _save(self, filename, writer, details):
+        target = self._target(filename)
+        self.status = "running"
+        self.files.pop(target.name, None)
+        self._write_index()
+        temporary = self._temporary_path(target)
+        try:
+            writer(temporary)
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
+        # 저장에 성공한 파일만 이번 실행의 목록에 기록합니다.
+        self.files[target.name] = details
+        self._write_index()
+        return target
+
+    def save_table(self, filename, table, index=False, index_label=None):
+        """전체 표를 CSV로 저장합니다. 고객 ID 등 의미 있는 인덱스는 명시하세요."""
+        if isinstance(table, pd.Series):
+            table = table.to_frame()
+        if not isinstance(table, pd.DataFrame):
+            raise TypeError("table에는 Pandas DataFrame 또는 Series를 전달하세요.")
+        details = {"kind": "csv", "rows": len(table),
+                   "columns": len(table.columns) + (table.index.nlevels if index else 0)}
+        return self._save(
+            filename,
+            lambda path: table.to_csv(path, mode="w", encoding="utf-8-sig",
+                                      index=index, index_label=index_label),
+            details)
+
+    def save_text(self, filename, text):
+        """단계별 해석과 텍스트 출력을 저장합니다."""
+        return self._save(
+            filename, lambda path: path.write_text(str(text), encoding="utf-8"),
+            {"kind": "text"})
+
+    def save_figure(self, filename, fig):
+        """Matplotlib Figure를 저장합니다. 확장자로 그림 형식을 지정합니다."""
+        target = self._target(filename)
+        image_format = target.suffix.lstrip(".").lower()
+        if not image_format:
+            raise ValueError("그래프 파일명에 .png와 같은 확장자를 넣으세요.")
+        return self._save(
+            filename,
+            lambda path: fig.savefig(path, format=image_format, dpi=150, bbox_inches="tight"),
+            {"kind": "figure"})
+
+    def complete(self, required_files):
+        """필요한 결과가 이번 실행에서 모두 저장됐을 때만 완료로 표시합니다."""
+        targets = [self._target(name) for name in required_files]
+        missing = [path.name for path in targets
+                   if path.name not in self.files or not path.is_file()]
+        if missing:
+            self.status = "running"
+            self._write_index()
+            raise ValueError(f"이번 실행에서 저장되지 않은 필수 결과가 있습니다: {missing}")
+        self.status = "completed"
+        self._write_index()
+        return self.output_dir
