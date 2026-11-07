@@ -1,5 +1,0 @@
-Python: 3.12.16
-Python executable: /Users/dave17code0177/Desktop/a1-1-hnm-customer-analysis/.venv/bin/python
-Project: /Users/dave17code0177/Desktop/a1-1-hnm-customer-analysis
-NumPy: 2.3.5
-Pandas: 2.2.3

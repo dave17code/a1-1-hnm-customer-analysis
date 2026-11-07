@@ -1,5 +1,0 @@
-﻿target,checked,before_missing,after_missing,action
-customer.club_member_status,1000,3,0,Unknown으로 표시
-customer.age,1000,3,0,group_median; 전체 통계 대체 0명
-product.image,6055,8,8,이미지 특성만 결측으로 유지; 거래는 보존
-transaction.price,11153,0,0,IQR 극단값 535행; 비교용 컬럼만 clip
