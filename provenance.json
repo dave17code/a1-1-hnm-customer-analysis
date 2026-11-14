@@ -52,8 +52,59 @@
   "image_dtype": "uint8",
   "image_sampling": "NumPy의 균등 좌표 인덱싱; 원본 이미지가 아닌 축소 배열의 통계를 분석",
   "frequency_definition": "고객별 서로 다른 구매 날짜 수; 정확한 주문/방문 횟수가 아님",
-  "monetary_definition": "원본 거래행 price 합; 통화 환산하지 않음",
+  "monetary_definition": "H&M 원본 거래행 price 값을 보존한 amount의 합; 수량 추정·통화 환산하지 않음",
   "numpy_version": "2.3.5",
   "pandas_version": "2.2.3",
-  "data_bytes": 28749019
+  "preparation": {
+    "input_file": "analysis_input.csv",
+    "rows": 11153,
+    "columns": [
+      "order_date",
+      "customer_id",
+      "article_id",
+      "amount",
+      "prod_name",
+      "product_type_name",
+      "club_member_status",
+      "age"
+    ],
+    "source_kind": "H&M 원본에서 추출한 표본을 결합한 분석용 입력",
+    "source_sample_sha256": {
+      "transactions.csv": "c87900463b5f60f4af8676dd8483e279294d8e77f7e548995cdaa44f1035e57f",
+      "customers.csv": "16e317ef1a7c0832816526d7267f1c714431bc164551cde04a2734024329a941",
+      "articles.csv": "94e385e300ddb69fb2dbba85f469a8235340f76f5e7c867967b75a2e09921239"
+    },
+    "analysis_input_sha256": "ff873e7905c0b5e0d4610022d5fc16b0c2d78fa67e7ea7714f26e0f7f189c019",
+    "images_sha256": "9e8e33d1ade52dc548cc1b55a1ac111e243c28f422a3d0e6d62d51c28cb2b0cd",
+    "steps": [
+      "t_dat를 order_date로 변경",
+      "원본 price를 amount로 복사",
+      "article_id로 상품 정보를 many_to_one LEFT JOIN",
+      "customer_id로 고객 정보를 many_to_one LEFT JOIN",
+      "중복 price와 사용하지 않는 구매 채널·상품 대분류·색상 컬럼 제거; 필수 분석용 8컬럼 유지"
+    ],
+    "checks": [
+      "거래 행 수와 순서 보존",
+      "원래 customer_id/article_id 및 선행 0 보존",
+      "고객/상품 ID 유일성과 거래의 참조 ID 검증",
+      "제공된 01_loaded_transactions.csv와 결합 결과 대조",
+      "유지한 8컬럼의 값·결측치·행 순서가 이전 입력과 문자 단위로 일치"
+    ],
+    "unprocessed_at_input": [
+      "고객 나이 결측치 3명",
+      "회원 상태 결측치 3명",
+      "이미지/텍스트 특성 미계산",
+      "IQR/RFM 미계산"
+    ],
+    "original_sample_files_required_at_runtime": false,
+    "source_sample_data_bytes": 28749019,
+    "runtime_data_bytes_excluding_provenance": 28684364,
+    "previous_joined_input_sha256": "396652963796834575539cb0d94cc0e4809154cd24d8e06f3371518831e8e101",
+    "removed_columns": [
+      "price",
+      "sales_channel_id",
+      "product_group_name",
+      "colour_group_name"
+    ]
+  }
 }
