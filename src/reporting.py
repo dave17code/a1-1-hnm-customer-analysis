@@ -138,13 +138,20 @@ class AnalysisReport:
         axes[0].margins(y=0.15)
         axes[0].tick_params(axis="x", labelrotation=12)
         axes[0].set(title="3. Customers by RFM segment", xlabel="Segment", ylabel="Customers")
-        sns.heatmap(self.correlation, annot=True, fmt=".2f", vmin=-1, vmax=1, center=0,
-                    cmap="vlag", square=True, ax=axes[1], cbar_kws={"label": "Pearson r"})
-        axes[1].set(title="4. RFM correlation", xlabel="RFM metric", ylabel="RFM metric")
+        # 전체 상관행렬에서 대각선과 그 아래를 가린 뒤, 완전히 빈 마지막 행과 첫 열을 생략합니다.
+        hide_lower = np.tril(np.ones(self.correlation.shape, dtype=bool))
+        sns.heatmap(self.correlation.iloc[:-1, 1:], mask=hide_lower[:-1, 1:],
+                    annot=True, fmt="+.2f", vmin=-1, vmax=1, center=0, cmap="vlag",
+                    square=True, linewidths=1, linecolor="white", ax=axes[1],
+                    cbar_kws={"label": "Pearson r"})
+        axes[1].set(title="4. RFM correlation (unique pairs)", xlabel="RFM metric", ylabel="RFM metric")
+        axes[1].grid(False)
+        axes[1].tick_params(axis="y", labelrotation=0)
         self._show(fig, {3, 4})
         by_group = " · ".join(f"{name} {count:,}명" for name, count in segments.customers.items())
         largest = segments.customers.idxmax()
         rf = self.correlation.loc["Recency", "Frequency"]
+        rm = self.correlation.loc["Recency", "Monetary"]
         fm = self.correlation.loc["Frequency", "Monetary"]
         display(Markdown(f"""#### ③ 왼쪽 막대그래프 · 각 그룹에는 고객이 몇 명 있을까요?
 
@@ -154,16 +161,17 @@ class AnalysisReport:
 
 {len(segments)}개 막대의 높이를 더하면 표본 고객 {len(rfm):,}명입니다. 가장 높은 {largest} 막대에는 전체 고객의 {segments.loc[largest, 'customer_pct']:.1f}%가 속합니다. VIP 유지 혜택이나 AtRisk 재방문 안내를 기획할 때 각 막대의 높이로 대상 규모를 가늠할 수 있습니다.
 
-#### ④ 오른쪽 히트맵 · 여러 날 구매한 고객은 누적 구매금액도 클까요?
+#### ④ RFM 지표 간 상관관계
 
-가로·세로에서 두 지표가 만나는 칸을 보세요. 여기 쓰이는 값은 점수로 바꾸기 전의 미구매 일수(R), 서로 다른 구매 날짜 수(F), 누적 구매금액(M)입니다.
+위쪽 두 칸을 왼쪽부터 읽고, 그다음 오른쪽 아래 칸을 보세요. 행과 열이 만나는 곳에 고객 {len(rfm):,}명의 피어슨 상관계수가 적혀 있습니다. 같은 지표끼리 비교한 값은 항상 1이고, 두 지표의 순서를 뒤집으면 같은 값이 나옵니다. 그래서 서로 다른 세 쌍에만 색과 숫자를 표시했습니다.
 
-| 함께 읽을 지표 | 피어슨 상관계수 | 이 표본에서 읽을 수 있는 경향 |
-|---|---:|---|
-| 구매일 수와 누적금액(F–M) | {fm:+.3f} | 여러 날 구매한 고객일수록 누적 구매금액도 대체로 큽니다. |
-| 마지막 구매 후 지난 일수와 구매일 수(R–F) | {rf:+.3f} | 마지막 구매가 오래전인 고객일수록 관찰 기간의 구매일 수가 대체로 적습니다. |
+| 그림 속 위치 | 비교한 두 값 | 상관계수 | 이 표본에서의 의미 |
+|---|---|---:|---|
+| 왼쪽 위 | 마지막 구매 후 지난 일수(R) × 구매일 수(F) | {rf:+.2f} | 마지막 구매가 오래전인 고객일수록 구매일 수가 대체로 적었습니다. |
+| 오른쪽 위 | 마지막 구매 후 지난 일수(R) × 누적 구매금액(M) | {rm:+.2f} | 마지막 구매가 오래전인 고객일수록 누적금액도 다소 적었습니다. |
+| 오른쪽 아래 | 구매일 수(F) × 누적 구매금액(M) | {fm:+.2f} | 여러 날 구매한 고객일수록 누적금액이 대체로 컸습니다. |
 
-R의 방향에 주목하세요. 어제 샀다면 R은 1일, 100일 전에 샀다면 100일입니다. R이 클수록 마지막 구매에서 시간이 더 흘렀다는 뜻입니다. 또 M에는 여러 날의 구매가 합산되므로 F와 M이 함께 커질 수 있습니다. 캠페인이 지출을 늘리는지는 후속 구매를 따로 비교해야 판단할 수 있습니다."""))
+부호는 관계의 방향이고, 0에서 멀수록 직선 관계가 강합니다. R은 어제 구매했다면 1일, 100일 전에 구매했다면 100일입니다. 그래서 왼쪽 위 칸의 음수는 최근까지 구매한 고객에게 구매일 수가 많은 경향을 뜻합니다. 세 칸 중 관계가 가장 뚜렷한 F–M은 다음 산점도에서 고객 한 명씩 확인할 수 있습니다."""))
 
         start, end = pd.Timestamp(a.meta["window_start"]), pd.Timestamp(a.meta["reference_date"])
         months = pd.period_range(start, end, freq="M")
@@ -197,7 +205,7 @@ R의 방향에 주목하세요. 어제 샀다면 R은 1일, 100일 전에 샀다
 
 셀 02의 첫 고객을 이 그림에 찍으면 가로 {example.Frequency}일, 세로 약 {example.Monetary:.2f}입니다. 이 고객의 거래는 {purchases:,}행이지만 같은 날 여러 상품을 산 기록을 하루로 세기 때문에 가로 위치는 {example.Frequency}입니다.
 
-가로축 `{fewest_days}`에서 점들이 세로로 늘어선 부분을 보세요. 이 위치에 있는 {len(same_days):,}명은 똑같이 {fewest_days}일 구매했지만, 구매금액은 {same_days.min():.4f}에서 {same_days.max():.4f}까지 퍼져 있습니다. ④ 히트맵이 전체 경향을 숫자 하나로 요약했다면, 이 그림에서는 구매일 수가 같아도 개인별 지출에 차이가 난다는 점을 볼 수 있습니다.
+가로축 `{fewest_days}`에서 점들이 세로로 늘어선 부분을 보세요. 이 위치에 있는 {len(same_days):,}명은 똑같이 {fewest_days}일 구매했지만, 구매금액은 {same_days.min():.4f}에서 {same_days.max():.4f}까지 퍼져 있습니다. ④의 오른쪽 아래 F–M 칸이 전체 고객의 구매일 수와 누적금액 관계를 숫자 하나로 요약했다면, 이 그림에서는 구매일 수가 같아도 개인별 지출에 차이가 난다는 점을 볼 수 있습니다.
 
 #### ⑥ 오른쪽 라인차트 · 어느 달에 표본 고객의 총구매금액이 가장 컸을까요?
 
@@ -224,7 +232,7 @@ R의 방향에 주목하세요. 어제 샀다면 R은 1일, 100일 전에 샀다
         assert len(a.image_ids) == len(a.image_features) > 0
         assert rfm.segment.nunique() >= 4
         assert rfm[["R_score", "F_score", "M_score"]].isin([1, 2, 3, 4]).all().all()
-        assert np.isfinite([self.correlation.loc["Recency", "Frequency"], self.correlation.loc["Frequency", "Monetary"]]).all()
+        assert np.isfinite(self.correlation.to_numpy()).all()
         assert self.shown_charts == {1, 2, 3, 4, 5, 6}
         self.outputs.complete()
 
