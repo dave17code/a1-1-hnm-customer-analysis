@@ -104,12 +104,32 @@ class AnalysisReport:
         sns.boxplot(data=df[["amount", "amount_iqr"]].rename(columns={"amount": "Original", "amount_iqr": "IQR clipped"}), ax=axes[1])
         axes[1].set(title="2. Amount before and after IQR treatment", xlabel="Treatment", ylabel="Amount (provided units)")
         self._show(fig, {1, 2})
-        self._notes(
-            f"**① 히스토그램:** 거래금액 중앙값 **{df.amount.median():.4f}**, 범위 **{df.amount.min():.4f}~{df.amount.max():.4f}**. "
-            f"**② 박스플롯:** 표준편차 **{df.amount.std():.4f} → {df.amount_iqr.std():.4f}**, "
-            f"최댓값 **{df.amount.max():.4f} → {df.amount_iqr.max():.4f}**.",
-            "① 중심 구간과 고액 거래의 긴 꼬리를 함께 확인해야 대표 거래금액을 설명할 수 있습니다. "
-            "② 극단값 제한으로 분포가 얼마나 달라지는지 비교합니다. RFM에는 제한하지 않은 amount를 사용합니다.")
+        tallest = max(axes[0].patches, key=lambda bar: bar.get_height())
+        left = tallest.get_x()
+        right = left + tallest.get_width()
+        bounds = a.outlier_report
+        upper = bounds["upper"]
+        above = df.amount.gt(upper).sum()
+        upper_whisker = df.loc[df.amount.le(upper), "amount"].max()
+        display(Markdown(f"""#### ① 왼쪽 히스토그램 · 어느 금액대의 거래가 가장 많을까요?
+
+가로축은 H&M이 제공한 단위의 거래금액, 세로축은 거래 건수입니다. 막대 하나의 너비는 금액 구간이고 높이는 그 구간에 들어간 거래 수입니다.
+
+가장 높은 막대부터 보세요. 약 `{left:.4f}~{right:.4f}` 구간에 {tallest.get_height():,.0f}건이 모여 있습니다. 반면 `0.15` 이상인 거래는 통틀어 {df.amount.ge(0.15).sum():,}건입니다. 세로축이 수천 건까지 올라가서 오른쪽의 작은 막대가 바닥선과 거의 겹쳐 보입니다. 거래금액의 중앙값은 `{df.amount.median():.4f}`이고, 소수의 고액 거래가 오른쪽으로 긴 꼬리를 만듭니다.
+
+#### ② 오른쪽 박스플롯 · 금액이 큰 거래를 경계값으로 제한하면 무엇이 달라질까요?
+
+아래쪽에 납작하게 색칠된 직사각형이 상자입니다. 왼쪽 `Original`은 원본 거래금액, 오른쪽 `IQR clipped`는 셀 04에서 만든 비교용 금액입니다.
+
+| 그림에서 볼 부분 | 읽는 방법 |
+|---|---|
+| 상자의 아랫변과 윗변 | 아랫변은 Q1({bounds['q1']:.5f}), 윗변은 Q3({bounds['q3']:.5f})입니다. 거래금액의 가운데 절반이 이 사이에 있습니다. |
+| 상자 안의 가로선 | 중앙값({df.amount.median():.5f})입니다. |
+| 상자의 세로 높이 | `IQR = Q3 − Q1`로 구한 폭({bounds['iqr']:.5f})입니다. |
+| 원본 상자에서 위로 뻗은 선(수염)의 끝 | 위쪽 경계를 넘지 않은 관측값 중 가장 큰 값({upper_whisker:.5f})입니다. |
+| 원본 상자 위에 따로 찍힌 동그라미 | 위쪽 경계({upper:.5f})를 넘은 거래입니다. 금액이 같거나 비슷하면 점이 겹쳐 보입니다. |
+
+셀 04에서 위쪽 경계를 넘은 {above:,}건의 비교용 금액을 경계까지 낮췄습니다. 가장 큰 거래 한 건을 따라가면 원본 `amount`는 {df.amount.max():.5f}, 비교용 `amount_iqr`는 {df.amount_iqr.max():.5f}입니다. 그래서 오른쪽에서는 위쪽 점들이 사라지고 두 상자의 가운데 부분은 거의 같은 높이에 남습니다. 양쪽 모두 {len(df):,}건입니다. 고객별·월별 구매금액은 원본을 더합니다."""))
 
         self.correlation = rfm[["Recency", "Frequency", "Monetary"]].corr(method="pearson")
         fig, axes = plt.subplots(1, 2, figsize=(13, 4.8))
@@ -122,14 +142,28 @@ class AnalysisReport:
                     cmap="vlag", square=True, ax=axes[1], cbar_kws={"label": "Pearson r"})
         axes[1].set(title="4. RFM correlation", xlabel="RFM metric", ylabel="RFM metric")
         self._show(fig, {3, 4})
+        by_group = " · ".join(f"{name} {count:,}명" for name, count in segments.customers.items())
         largest = segments.customers.idxmax()
-        rf, fm = self.correlation.loc["Recency", "Frequency"], self.correlation.loc["Frequency", "Monetary"]
-        self._notes(
-            f"**③ 막대그래프:** 가장 큰 그룹은 **{largest}, {int(segments.loc[largest, 'customers']):,}명"
-            f"({segments.loc[largest, 'customer_pct']:.1f}%)**입니다. **④ 히트맵:** R–F 상관계수 **{rf:.3f}**, F–M **{fm:.3f}**입니다.",
-            "③ 고객 수와 금액 기여도를 함께 보고 캠페인 규모를 정할 수 있습니다. "
-            "④ R–F가 음수이면 최근 구매 고객에서 구매일 수가 많은 경향이고, F–M이 양수이면 구매일 수와 금액이 함께 커지는 경향입니다. "
-            "누적 구매 구조의 영향도 있으므로 상관관계가 인과관계를 증명하지는 않습니다.")
+        rf = self.correlation.loc["Recency", "Frequency"]
+        fm = self.correlation.loc["Frequency", "Monetary"]
+        display(Markdown(f"""#### ③ 왼쪽 막대그래프 · 각 그룹에는 고객이 몇 명 있을까요?
+
+막대 하나가 고객 그룹 하나입니다. 가로축에서 그룹을 고르고 막대 위의 숫자를 읽으면 그 그룹의 인원수를 알 수 있습니다.
+
+{by_group}
+
+{len(segments)}개 막대의 높이를 더하면 표본 고객 {len(rfm):,}명입니다. 가장 높은 {largest} 막대에는 전체 고객의 {segments.loc[largest, 'customer_pct']:.1f}%가 속합니다. VIP 유지 혜택이나 AtRisk 재방문 안내를 기획할 때 각 막대의 높이로 대상 규모를 가늠할 수 있습니다.
+
+#### ④ 오른쪽 히트맵 · 여러 날 구매한 고객은 누적 구매금액도 클까요?
+
+가로·세로에서 두 지표가 만나는 칸을 보세요. 여기 쓰이는 값은 점수로 바꾸기 전의 미구매 일수(R), 서로 다른 구매 날짜 수(F), 누적 구매금액(M)입니다.
+
+| 함께 읽을 지표 | 피어슨 상관계수 | 이 표본에서 읽을 수 있는 경향 |
+|---|---:|---|
+| 구매일 수와 누적금액(F–M) | {fm:+.3f} | 여러 날 구매한 고객일수록 누적 구매금액도 대체로 큽니다. |
+| 마지막 구매 후 지난 일수와 구매일 수(R–F) | {rf:+.3f} | 마지막 구매가 오래전인 고객일수록 관찰 기간의 구매일 수가 대체로 적습니다. |
+
+R의 방향에 주목하세요. 어제 샀다면 R은 1일, 100일 전에 샀다면 100일입니다. R이 클수록 마지막 구매에서 시간이 더 흘렀다는 뜻입니다. 또 M에는 여러 날의 구매가 합산되므로 F와 M이 함께 커질 수 있습니다. 캠페인이 지출을 늘리는지는 후속 구매를 따로 비교해야 판단할 수 있습니다."""))
 
         start, end = pd.Timestamp(a.meta["window_start"]), pd.Timestamp(a.meta["reference_date"])
         months = pd.period_range(start, end, freq="M")
@@ -149,13 +183,27 @@ class AnalysisReport:
         axes[1].tick_params(axis="x", labelsize=8)
         axes[1].set(title="6. Monthly spend of sampled customers", xlabel="Month in observation window", ylabel="Total spend (provided units)")
         self._show(fig, {5, 6})
+        first_id = df.customer_id.iloc[0]
+        example = rfm.loc[first_id]
+        purchases = df.customer_id.eq(first_id).sum()
+        fewest_days = rfm.Frequency.min()
+        same_days = rfm.loc[rfm.Frequency.eq(fewest_days), "Monetary"]
         peak = self.monthly.idxmax()
-        self._notes(
-            f"**⑤ 산점도:** 고객 **{len(rfm):,}명**, 구매일 수 **{rfm.Frequency.min()}~{rfm.Frequency.max()}일**, "
-            f"금액 **{rfm.Monetary.min():.4f}~{rfm.Monetary.max():.4f}**입니다. "
-            f"**⑥ 라인차트:** **{len(months)}개 달력월** 중 최고 합계는 **{peak}, {self.monthly.loc[peak]:.4f}**입니다.",
-            "⑤ 같은 구매일 수에서도 금액 차이를 볼 수 있습니다. 색은 RFM으로 정한 그룹이므로 독립적인 예측 성능은 아닙니다. "
-            "⑥ partial은 한 달 일부만 관측한 구간입니다. 첫 달·마지막 달의 낮은 합계를 곧바로 매출 하락으로 해석할 수 없습니다.")
+        partial_months = month_table.loc[month_table.is_partial, "observed_days"]
+        partial_text = ", ".join(f"{month.month}월 {days}일치" for month, days in partial_months.items())
+        display(Markdown(f"""#### ⑤ 왼쪽 산점도 · 구매한 날짜 수가 같으면 지출도 비슷할까요?
+
+점 하나가 고객 한 명입니다. 오른쪽으로 갈수록 구매한 날짜가 많고 위로 갈수록 누적 구매금액이 큽니다. 색은 셀 06에서 배정한 그룹을 나타냅니다.
+
+셀 02의 첫 고객을 이 그림에 찍으면 가로 {example.Frequency}일, 세로 약 {example.Monetary:.2f}입니다. 이 고객의 거래는 {purchases:,}행이지만 같은 날 여러 상품을 산 기록을 하루로 세기 때문에 가로 위치는 {example.Frequency}입니다.
+
+가로축 `{fewest_days}`에서 점들이 세로로 늘어선 부분을 보세요. 이 위치에 있는 {len(same_days):,}명은 똑같이 {fewest_days}일 구매했지만, 구매금액은 {same_days.min():.4f}에서 {same_days.max():.4f}까지 퍼져 있습니다. ④ 히트맵이 전체 경향을 숫자 하나로 요약했다면, 이 그림에서는 구매일 수가 같아도 개인별 지출에 차이가 난다는 점을 볼 수 있습니다.
+
+#### ⑥ 오른쪽 라인차트 · 어느 달에 표본 고객의 총구매금액이 가장 컸을까요?
+
+가로축은 달, 세로축은 그달 표본 고객들의 원본 거래금액을 모두 더한 값입니다. 가장 높은 점은 {peak.year}년 {peak.month}월의 {self.monthly.loc[peak]:.4f}입니다. 바로 위 월별 표의 `amount` 열에서 다른 달의 정확한 합계도 확인할 수 있습니다.
+
+가로축의 `partial`은 관찰 기간이 그달의 일부만 포함한다는 표시입니다. 관찰 기간은 {start.date()}부터 {end.date()}까지입니다. {partial_text + '의 거래가 포함됩니다.' if partial_text else '이 기간에는 달 전체를 관찰했습니다.'} 첫 달이나 마지막 달의 합계가 작아 보이면, 표의 `observed_days`에서 며칠을 관찰했는지 먼저 확인하세요."""))
 
     def _validate(self):
         a, df, rfm = self.analyzer, self.analyzer.df, self.analyzer.rfm
