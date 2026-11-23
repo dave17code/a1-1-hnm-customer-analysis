@@ -131,7 +131,9 @@ class AnalysisReport:
 
 셀 04에서 위쪽 경계를 넘은 {above:,}건의 비교용 금액을 경계까지 낮췄습니다. 가장 큰 거래 한 건을 따라가면 원본 `amount`는 {df.amount.max():.5f}, 비교용 `amount_iqr`는 {df.amount_iqr.max():.5f}입니다. 그래서 오른쪽에서는 위쪽 점들이 사라지고 두 상자의 가운데 부분은 거의 같은 높이에 남습니다. 양쪽 모두 {len(df):,}건입니다. 고객별·월별 구매금액은 원본을 더합니다."""))
 
-        self.correlation = rfm[["Recency", "Frequency", "Monetary"]].corr(method="pearson")
+        # 스피어만 계수는 각 지표의 순위 사이의 상관계수입니다. 동점은 평균 순위를 씁니다.
+        rfm_ranks = rfm[["Recency", "Frequency", "Monetary"]].rank(method="average")
+        self.correlation = rfm_ranks.corr()
         fig, axes = plt.subplots(1, 2, figsize=(13, 4.8))
         bars = axes[0].bar(segments.index, segments.customers, color=[palette[s] for s in segments.index])
         axes[0].bar_label(bars, padding=3)
@@ -143,8 +145,8 @@ class AnalysisReport:
         sns.heatmap(self.correlation.iloc[:-1, 1:], mask=hide_lower[:-1, 1:],
                     annot=True, fmt="+.2f", vmin=-1, vmax=1, center=0, cmap="vlag",
                     square=True, linewidths=1, linecolor="white", ax=axes[1],
-                    cbar_kws={"label": "Pearson r"})
-        axes[1].set(title="4. RFM correlation (unique pairs)", xlabel="RFM metric", ylabel="RFM metric")
+                    cbar_kws={"label": "Spearman ρ"})
+        axes[1].set(title="4. Spearman rank correlation", xlabel="RFM metric", ylabel="RFM metric")
         axes[1].grid(False)
         axes[1].tick_params(axis="y", labelrotation=0)
         self._show(fig, {3, 4})
@@ -153,6 +155,9 @@ class AnalysisReport:
         rf = self.correlation.loc["Recency", "Frequency"]
         rm = self.correlation.loc["Recency", "Monetary"]
         fm = self.correlation.loc["Frequency", "Monetary"]
+        first_id = df.customer_id.iloc[0]
+        example = rfm.loc[first_id]
+        example_ranks = rfm_ranks.loc[first_id]
         display(Markdown(f"""#### ③ 왼쪽 막대그래프 · 각 그룹에는 고객이 몇 명 있을까요?
 
 막대 하나가 고객 그룹 하나입니다. 가로축에서 그룹을 고르고 막대 위의 숫자를 읽으면 그 그룹의 인원수를 알 수 있습니다.
@@ -161,17 +166,29 @@ class AnalysisReport:
 
 {len(segments)}개 막대의 높이를 더하면 표본 고객 {len(rfm):,}명입니다. 가장 높은 {largest} 막대에는 전체 고객의 {segments.loc[largest, 'customer_pct']:.1f}%가 속합니다. VIP 유지 혜택이나 AtRisk 재방문 안내를 기획할 때 각 막대의 높이로 대상 규모를 가늠할 수 있습니다.
 
-#### ④ RFM 지표 간 상관관계
+#### ④ RFM 지표 간 스피어만 순위상관
 
-위쪽 두 칸을 왼쪽부터 읽고, 그다음 오른쪽 아래 칸을 보세요. 행과 열이 만나는 곳에 고객 {len(rfm):,}명의 피어슨 상관계수가 적혀 있습니다. 같은 지표끼리 비교한 값은 항상 1이고, 두 지표의 순서를 뒤집으면 같은 값이 나옵니다. 그래서 서로 다른 세 쌍에만 색과 숫자를 표시했습니다.
+‘구매한 날짜가 많은 고객은 총구매금액도 큰 편일까?’를 알아보려고 고객 {len(rfm):,}명을 두 번 줄 세웠습니다. 한 번은 구매일 수가 적은 순서로, 한 번은 누적금액이 작은 순서로 세웁니다. 셀 02의 첫 고객은 {example.Frequency}일 구매해 첫 줄에서는 {example_ranks.Frequency:g}번째, 약 {example.Monetary:.2f}를 써서 둘째 줄에서는 {example_ranks.Monetary:g}번째입니다. 이 고객은 두 줄 모두 뒤쪽에 섭니다.
 
-| 그림 속 위치 | 비교한 두 값 | 상관계수 | 이 표본에서의 의미 |
+스피어만 계수는 모든 고객의 두 순서가 얼마나 비슷한지를 −1에서 +1 사이로 요약합니다. 두 순서가 비슷할수록 +1, 반대로 정렬될수록 −1에 가까워집니다. 서로 같은 값을 가진 고객은 그들이 차지하는 자리의 평균 순위를 받습니다. 이 계산에는 셀 06의 1~4점으로 묶기 전인 실제 미구매 일수(R), 구매일 수(F), 누적금액(M)을 사용합니다.
+
+| 그림 속 위치 | 비교한 두 순위 | 스피어만 계수 | 이 표본에서의 의미 |
 |---|---|---:|---|
-| 왼쪽 위 | 마지막 구매 후 지난 일수(R) × 구매일 수(F) | {rf:+.2f} | 마지막 구매가 오래전인 고객일수록 구매일 수가 대체로 적었습니다. |
-| 오른쪽 위 | 마지막 구매 후 지난 일수(R) × 누적 구매금액(M) | {rm:+.2f} | 마지막 구매가 오래전인 고객일수록 누적금액도 다소 적었습니다. |
-| 오른쪽 아래 | 구매일 수(F) × 누적 구매금액(M) | {fm:+.2f} | 여러 날 구매한 고객일수록 누적금액이 대체로 컸습니다. |
+| 왼쪽 위 | 미구매 일수(R)와 구매일 수(F) | {rf:+.2f} | 마지막 구매 후 오래 지난 고객은 R이 큰 쪽에, 구매일 수는 적은 쪽에 서는 경향이 있었습니다. 두 순서가 반대 방향이어서 음수입니다. |
+| 오른쪽 위 | 미구매 일수(R)와 누적금액(M) | {rm:+.2f} | 마지막 구매가 오래전인 고객일수록 누적금액이 작은 쪽에 서는 경향이 있었습니다. |
+| 오른쪽 아래 | 구매일 수(F)와 누적금액(M) | {fm:+.2f} | 여러 날 구매한 고객일수록 누적금액도 큰 쪽에 섰습니다. 같은 고객이 두 줄에서 비슷한 위치에 서는 경향이어서 양수입니다. |
 
-"""))
+왼쪽 아래는 구매일 수(F)를 자기 자신과 비교하는 자리여서 비워 두었습니다.
+
+##### 실제 구매금액으로 읽는 F–M 관계
+
+아래 표에서 같은 구매일 수 구간에 속한 고객 중 가운데에 해당하는 누적 구매금액(중앙값)을 비교해 보세요. 금액은 H&M 제공 단위입니다. 히트맵 계수는 {len(rfm):,}명의 개별 순위로 구했고, 이 표는 그 경향을 실제 금액으로 살펴보기 위한 요약입니다."""))
+        purchase_days = pd.cut(rfm.Frequency, bins=[0, 1, 2, 3, np.inf],
+                               labels=["1일", "2일", "3일", "4일 이상"])
+        spend_by_days = rfm.groupby(purchase_days, observed=True)["Monetary"].agg(
+            고객_수="size", 누적금액_중앙값="median")
+        spend_by_days.index.name = "구매일 수"
+        display(spend_by_days.round(4))
 
         start, end = pd.Timestamp(a.meta["window_start"]), pd.Timestamp(a.meta["reference_date"])
         months = pd.period_range(start, end, freq="M")
@@ -181,6 +198,7 @@ class AnalysisReport:
         month_table["observed_days"] = [
             (min(p.end_time.normalize(), end) - max(p.start_time, start)).days + 1 for p in months]
         month_table["is_partial"] = [p.start_time < start or p.end_time.normalize() > end for p in months]
+        display(Markdown("##### ⑥ 라인차트에 사용하는 월별 구매금액"))
         display(month_table.round(4))
         labels = [str(p) + ("\n(partial)" if partial else "") for p, partial in zip(months, month_table.is_partial)]
         fig, axes = plt.subplots(1, 2, figsize=(13, 4.8))
@@ -191,8 +209,6 @@ class AnalysisReport:
         axes[1].tick_params(axis="x", labelsize=8)
         axes[1].set(title="6. Monthly spend of sampled customers", xlabel="Month in observation window", ylabel="Total spend (provided units)")
         self._show(fig, {5, 6})
-        first_id = df.customer_id.iloc[0]
-        example = rfm.loc[first_id]
         purchases = df.customer_id.eq(first_id).sum()
         fewest_days = rfm.Frequency.min()
         same_days = rfm.loc[rfm.Frequency.eq(fewest_days), "Monetary"]
@@ -205,7 +221,7 @@ class AnalysisReport:
 
 셀 02의 첫 고객을 이 그림에 찍으면 가로 {example.Frequency}일, 세로 약 {example.Monetary:.2f}입니다. 이 고객의 거래는 {purchases:,}행이지만 같은 날 여러 상품을 산 기록을 하루로 세기 때문에 가로 위치는 {example.Frequency}입니다.
 
-가로축 `{fewest_days}`에서 점들이 세로로 늘어선 부분을 보세요. 이 위치에 있는 {len(same_days):,}명은 똑같이 {fewest_days}일 구매했지만, 구매금액은 {same_days.min():.4f}에서 {same_days.max():.4f}까지 퍼져 있습니다. ④의 오른쪽 아래 F–M 칸이 전체 고객의 구매일 수와 누적금액 관계를 숫자 하나로 요약했다면, 이 그림에서는 구매일 수가 같아도 개인별 지출에 차이가 난다는 점을 볼 수 있습니다.
+가로축 `{fewest_days}`에서 점들이 세로로 늘어선 부분을 보세요. 이 위치에 있는 {len(same_days):,}명은 똑같이 {fewest_days}일 구매했지만, 구매금액은 {same_days.min():.4f}에서 {same_days.max():.4f}까지 퍼져 있습니다. ④의 F–M 칸은 두 순위의 관계를 요약합니다. 이 산점도는 실제 일수와 금액으로 그리기 때문에, 같은 일수만큼 구매한 사람들 사이의 지출 차이까지 보입니다.
 
 #### ⑥ 오른쪽 라인차트 · 어느 달에 표본 고객의 총구매금액이 가장 컸을까요?
 
