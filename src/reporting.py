@@ -152,9 +152,9 @@ class AnalysisReport:
         self._show(fig, {3, 4})
         by_group = " · ".join(f"{name} {count:,}명" for name, count in segments.customers.items())
         largest = segments.customers.idxmax()
-        rf = self.correlation.loc["Recency", "Frequency"]
-        rm = self.correlation.loc["Recency", "Monetary"]
-        fm = self.correlation.loc["Frequency", "Monetary"]
+        rf = f"{self.correlation.loc['Recency', 'Frequency']:+.2f}".replace("-", "−")
+        rm = f"{self.correlation.loc['Recency', 'Monetary']:+.2f}".replace("-", "−")
+        fm = f"{self.correlation.loc['Frequency', 'Monetary']:+.2f}".replace("-", "−")
         first_id = df.customer_id.iloc[0]
         example = rfm.loc[first_id]
         example_ranks = rfm_ranks.loc[first_id]
@@ -168,32 +168,28 @@ class AnalysisReport:
 
 #### ④ RFM 지표 간 스피어만 순위상관
 
-🛍️ 여러 날에 걸쳐 구매한 고객은 총구매금액도 큰 편일까요? 이를 확인하기 위해 고객 {len(rfm):,}명의 구매일 수와 누적 구매금액에 각각 순위를 매겼습니다. 구매한 날이 가장 많은 고객이 구매일 수 1위이고, 총구매금액이 가장 큰 고객이 누적 구매금액 1위입니다.
+히트맵의 세 숫자는 스피어만 상관계수입니다. 여기서 `R–F`는 “R과 F를 한 쌍으로 비교했다”는 뜻입니다. 가운데 `–`는 두 이름을 잇는 표시이고, 실제 음수 부호는 계산 결과인 `{rf}`에 붙습니다.
 
-| 셀 02에 나온 첫 고객의 기록 | {len(rfm):,}명 중 순위 |
-|---|---|
-| 서로 다른 {example.Frequency:g}일에 구매 | 구매일 수 {example_ranks.Frequency:g}위 |
-| 누적 구매금액 약 {example.Monetary:.2f} | 누적 구매금액 {example_ranks.Monetary:g}위 |
+🔍 이 계수가 답하는 질문은 “앞 지표가 뒤 지표에 얼마나 영향을 줬나?”가 아니라 “고객 {len(rfm):,}명의 순위를 두 지표로 각각 매겼을 때, 한쪽에서 상위권인 고객이 다른 쪽에서도 상위권인가?”입니다. 그래서 `R–F`로 계산해도, `F–R`로 순서를 바꿔도 결과는 똑같이 `{rf}`입니다.
 
-이 고객은 두 순위 모두 상위권입니다. 스피어만 상관계수는 이런 경향이 고객 {len(rfm):,}명 전체에서도 나타나는지 보여줍니다. 한 지표에서 상위권인 고객이 다른 지표에서도 대체로 상위권이면 계수는 양수이고, 다른 지표에서는 대체로 하위권이면 음수입니다.
-
-📊 히트맵에서 R을 읽을 때는 한 가지만 기억하면 됩니다. R은 ‘마지막 구매 후 지난 일수’이므로, R의 1위는 마지막 구매가 가장 오래전인 고객입니다.
-
-| 그림 속 위치 | 스피어만 계수 | 이 표본에서 읽을 수 있는 구매 패턴 |
+| 비교한 지표 | 스피어만 계수 | 이 프로젝트에서의 의미 |
 |---|---:|---|
-| 왼쪽 위 · 마지막 구매 후 지난 일수(R)와 구매일 수(F) | `{rf:+.2f}` | 마지막 구매가 오래전인 고객일수록, 관찰기간에 구매한 날은 대체로 적었습니다. |
-| 오른쪽 위 · 마지막 구매 후 지난 일수(R)와 누적 구매금액(M) | `{rm:+.2f}` | 마지막 구매가 오래전인 고객일수록, 관찰기간에 쓴 총금액은 대체로 작았습니다. |
-| 오른쪽 아래 · 구매일 수(F)와 누적 구매금액(M) | `{fm:+.2f}` | 여러 날에 걸쳐 구매한 고객일수록 총구매금액도 대체로 컸습니다. 처음에 던진 질문에 답해 주는 칸입니다. |
+| R과 F | `{rf}` | 마지막 구매 후 지난 일수가 많은 고객일수록, 관찰기간에 구매한 날은 대체로 적었습니다. |
+| R과 M | `{rm}` | 마지막 구매 후 지난 일수가 많은 고객일수록, 관찰기간의 누적 구매금액도 대체로 작았습니다. |
+| F와 M | `{fm}` | 여러 날에 걸쳐 구매한 고객일수록, 누적 구매금액도 대체로 컸습니다. |
 
-##### 실제 구매금액으로 읽는 F–M 관계
+예를 들어 셀 02의 첫 고객은 구매일 수 `{example_ranks.Frequency:g}위`, 누적 구매금액 `{example_ranks.Monetary:g}위`로 두 기준 모두 상위권입니다. `{fm}`은 이런 순위의 일치가 고객 전체에서 비교적 뚜렷했다는 뜻입니다. 이 숫자만으로는 구매일이 하루 늘 때 지출이 얼마나 늘어나는지, 구매일 수가 지출 증가의 원인인지까지는 알 수 없습니다.
 
-아래 표에서 같은 구매일 수 구간에 속한 고객 중 가운데에 해당하는 누적 구매금액(중앙값)을 비교해 보세요. 금액은 H&M 제공 단위입니다. 히트맵 계수는 {len(rfm):,}명의 개별 순위로 구했고, 이 표는 그 경향을 실제 금액으로 살펴보기 위한 요약입니다."""))
-        purchase_days = pd.cut(rfm.Frequency, bins=[0, 1, 2, 3, np.inf],
-                               labels=["1일", "2일", "3일", "4일 이상"])
-        spend_by_days = rfm.groupby(purchase_days, observed=True)["Monetary"].agg(
-            고객_수="size", 누적금액_중앙값="median")
-        spend_by_days.index.name = "구매일 수"
-        display(spend_by_days.round(4))
+🔍 스피어만 상관계수의 부호는 “한 지표의 값이 큰 고객들은 다른 지표에서도 값이 큰 편인가, 작은 편인가?”를 알려줍니다.
+
+| 부호 | 읽는 방법 | 프로젝트에서의 예 |
+|---|---|---|
+| 양수 `+` | 한쪽 값이 큰 고객은 다른 쪽 값도 대체로 큽니다. | F와 M은 `{fm}`입니다. 여러 날 구매한 고객일수록 누적 구매금액도 큰 편이었습니다. |
+| 음수 `−` | 한쪽 값이 큰 고객은 다른 쪽 값이 대체로 작습니다. | R과 F는 `{rf}`입니다. 마지막 구매 후 오래 지난 고객일수록 구매한 날은 적은 편이었습니다. |
+
+💡 `{rf}`가 특히 헷갈리는 이유는 R을 ‘최근에 샀는가’라고 읽기 쉽기 때문입니다. 실제로 R이 세는 것은 ‘마지막 구매 후 며칠이 지났는가’입니다. 어제 산 고객의 R은 `1`이고, 100일 전에 산 고객의 R은 `100`입니다. 그래서 “최근에 산 고객일수록 구매한 날이 많았다”를 숫자로 옮기면 “R이 작을수록 F가 컸다”가 됩니다. 두 값의 방향이 반대여서 음수입니다. `{rm}`도 같은 원리로, R이 큰 고객일수록 누적 구매금액 M이 작은 편이었다는 뜻입니다.
+
+부호가 관계의 방향을 알려준다면, `0`에서 얼마나 떨어져 있는지는 그 경향이 얼마나 뚜렷한지를 알려줍니다. `+1`에 가까우면 두 순위가 비슷하게 정렬되고, `−1`에 가까우면 반대 순서로 정렬됩니다. `0`에 가까우면 어느 한 방향의 순위 경향도 뚜렷하지 않습니다."""))
 
         start, end = pd.Timestamp(a.meta["window_start"]), pd.Timestamp(a.meta["reference_date"])
         months = pd.period_range(start, end, freq="M")
@@ -203,8 +199,6 @@ class AnalysisReport:
         month_table["observed_days"] = [
             (min(p.end_time.normalize(), end) - max(p.start_time, start)).days + 1 for p in months]
         month_table["is_partial"] = [p.start_time < start or p.end_time.normalize() > end for p in months]
-        display(Markdown("##### ⑥ 라인차트에 사용하는 월별 구매금액"))
-        display(month_table.round(4))
         labels = [str(p) + ("\n(partial)" if partial else "") for p, partial in zip(months, month_table.is_partial)]
         fig, axes = plt.subplots(1, 2, figsize=(13, 4.8))
         sns.scatterplot(data=rfm, x="Frequency", y="Monetary", hue="segment", palette=palette, alpha=.65, s=30, ax=axes[0])
@@ -230,9 +224,12 @@ class AnalysisReport:
 
 #### ⑥ 오른쪽 라인차트 · 어느 달에 표본 고객의 총구매금액이 가장 컸을까요?
 
-가로축은 달, 세로축은 그달 표본 고객들의 원본 거래금액을 모두 더한 값입니다. 가장 높은 점은 {peak.year}년 {peak.month}월의 {self.monthly.loc[peak]:.4f}입니다. 바로 위 월별 표의 `amount` 열에서 다른 달의 정확한 합계도 확인할 수 있습니다.
+가로축은 달, 세로축은 그달 표본 고객들의 원본 거래금액을 모두 더한 값입니다. 가장 높은 점은 {peak.year}년 {peak.month}월의 {self.monthly.loc[peak]:.4f}입니다. 아래 월별 표의 `amount` 열에서 다른 달의 정확한 합계도 확인할 수 있습니다.
 
-가로축의 `partial`은 관찰 기간이 그달의 일부만 포함한다는 표시입니다. 관찰 기간은 {start.date()}부터 {end.date()}까지입니다. {partial_text + '의 거래가 포함됩니다.' if partial_text else '이 기간에는 달 전체를 관찰했습니다.'} 첫 달이나 마지막 달의 합계가 작아 보이면, 표의 `observed_days`에서 며칠을 관찰했는지 먼저 확인하세요."""))
+가로축의 `partial`은 관찰 기간이 그달의 일부만 포함한다는 표시입니다. 관찰 기간은 {start.date()}부터 {end.date()}까지입니다. {partial_text + '의 거래가 포함됩니다.' if partial_text else '이 기간에는 달 전체를 관찰했습니다.'} 첫 달이나 마지막 달의 합계가 작아 보이면, 표의 `observed_days`에서 며칠을 관찰했는지 먼저 확인하세요.
+
+##### 월별 구매금액 집계표"""))
+        display(month_table.round(4))
 
     def _validate(self):
         a, df, rfm = self.analyzer, self.analyzer.df, self.analyzer.rfm
