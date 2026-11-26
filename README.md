@@ -22,20 +22,21 @@
 
 같은 날 이 고객이 산 다른 상품은 다른 행에 있습니다. 그래서 거래 행 수와 구매한 날짜 수가 다를 수 있습니다. 고객번호는 보기 좋게 위에서만 줄였습니다. 상품번호는 앞의 `0`까지 사진 데이터의 번호와 일치해야 합니다. 거래일은 원본 `t_dat`, 거래금액은 원본 `price`에서 가져왔으며, 분석은 금액을 H&M이 제공한 단위로 합산합니다.
 
+상품 사진과 픽셀 배열을 눈으로 확인하려면 압축을 푼 프로젝트에서 `first-10-rgb.html`을 웹 브라우저로 여세요. 처음 10장의 사진과 각 픽셀의 RGB 값이 같은 순서로 나옵니다.
+
 ## 🧭 2. 노트북 읽는 순서
 
-셀 01은 준비 단계이고, 셀 02부터 08까지가 미션의 분석 1~7단계입니다. 각 코드 위의 셀 번호를 따라가세요. VS Code의 대괄호 속 숫자는 현재 커널에서 코드를 실행한 순서입니다.
+셀 번호와 분석 단계 번호가 같습니다. 각 셀 위에는 분석 제목이 있고, 코드 아래에는 그 결과가 표시됩니다.
 
-| 셀 | 분석 질문 | 코드가 하는 일과 확인할 결과 |
+| 셀 | 분석 단계 | 코드에서 확인할 계산과 결과 |
 |---|---|---|
-| 01 | 어느 Python으로 어느 파일을 읽을까? | 프로젝트 위치를 찾고 계산용 `analyzer`, 저장용 `outputs`, 표시용 `report`를 만듭니다. |
-| 02 | 거래 한 줄에는 무엇이 있고 어디가 비었을까? | `load_data()`가 메모리에 거래표 `df`를 준비합니다. `head()`는 첫 5행, `info()`는 자료형·채워진 행 수, `describe()`는 금액 분포를 보여줍니다. |
-| 03 | 빈 고객 정보와 사진·상품명을 어떻게 다룰까? | 회원 상태가 빈 3명은 `Unknown`으로 표시합니다. 나이가 빈 다른 3명은 같은 회원 상태의 중앙값인 31세로 채웁니다. 각 거래에 상품명 길이, 사진의 RGB 평균·표준편차를 붙입니다. |
-| 04 | 유난히 큰 거래금액은 얼마나 많을까? | IQR 기준으로 535행을 표시하고 비교용 금액을 따로 만듭니다. 가공한 거래표를 첫 번째 CSV에 저장합니다. |
-| 05 | ‘평균’을 낼 때 무엇을 한 번씩 셀까? | 거래금액은 거래별, 나이는 고객별, 상품명은 상품별, 사진 수치는 사진별로 평균·중앙값·표준편차·사분위수를 구합니다. |
-| 06 | 어느 고객이 최근까지 반복 구매했을까? | 거래를 고객번호로 묶어 RFM을 계산하고 다섯 그룹으로 분류합니다. 고객별 결과를 두 번째 CSV에 저장합니다. |
-| 07 | 수치로 본 경향이 실제 분포에서도 보일까? | 히스토그램·박스플롯은 거래금액을, 막대·히트맵·산점도는 고객 패턴을, 라인차트는 월별 구매금액을 보여줍니다. |
-| 08 | 합계가 맞고 제안에 근거가 있을까? | 거래·금액 보존, 그룹과 파일 등을 검증하고 아래의 비즈니스 제안 세 가지를 갱신합니다. |
+| 01 | 거래 데이터 읽기 | `load_data()`로 거래표를 읽습니다. 첫 5행에서 한 줄의 의미를, `info()`에서 자료형과 채워진 값의 수를, `describe()`에서 거래금액의 분포를 확인합니다. |
+| 02 | 고객 결측치 대치와 상품 특성 계산 | `handle_missing_values()`로 나이와 회원 상태의 빈칸을 처리합니다. 상품명 길이와 사진의 RGB 평균·표준편차를 거래표에 붙입니다. |
+| 03 | 거래금액 이상치 찾기 | `detect_outliers()`로 IQR 경계를 벗어난 거래 535행을 표시합니다. 비교용 금액과 원본을 구분하고 전체 거래표를 첫 번째 CSV에 저장합니다. |
+| 04 | 거래·고객·상품별 기술통계 | 금액은 거래별, 나이는 고객별, 상품명과 이미지는 상품별로 집계합니다. 평균·중앙값·표준편차·사분위수를 비교합니다. |
+| 05 | RFM으로 고객 세분화 | `calculate_rfm()`으로 고객별 미구매 일수, 구매일 수, 누적금액을 구합니다. 다섯 그룹의 특징을 요약하고 고객별 기록을 두 번째 CSV에 저장합니다. |
+| 06 | 여섯 차트로 관계와 추세 읽기 | 거래금액 분포와 처리 전후 차이, 그룹 규모와 RFM 순위상관, 고객별 지출과 월별 구매금액을 차례로 확인합니다. |
+| 07 | 계산 검증과 캠페인 제안 | 고객별·월별 구매금액의 합을 원본과 대조하고, 두 CSV와 여섯 차트 등 산출물을 확인합니다. 검증을 통과한 결과로 README의 제안 세 가지를 갱신합니다. |
 
 거래 수만큼 같은 고객이나 상품이 반복되므로 분석 단위가 중요합니다. 예를 들어 한 사람이 67행에 등장해도 평균 나이를 낼 때는 한 사람으로 셉니다. 사진이 없는 8개 상품의 구매도 실제 거래이므로 금액 집계에 포함하고 사진 특성만 빈칸으로 둡니다.
 
@@ -57,44 +58,63 @@
 
 | 보고 싶은 것 | 저장 위치 | 저장 시점 |
 |---|---|---|
-| 가공 후 개별 거래 11,153행 × 11열 | [03_cleaned_transactions.csv](outputs/03_cleaned_transactions.csv) | 셀 04에서 결측치와 상품 특성 처리를 마친 후 |
-| 고객 1,000명 각각의 R·F·M, 점수, 그룹 | [05_customer_rfm.csv](outputs/05_customer_rfm.csv) | 셀 06에서 고객별 집계를 마친 후 |
+| 가공 후 개별 거래 11,153행 × 11열 | [03_cleaned_transactions.csv](outputs/03_cleaned_transactions.csv) | 셀 03에서 IQR 탐지를 마친 후 |
+| 고객 1,000명 각각의 R·F·M, 점수, 그룹 | [05_customer_rfm.csv](outputs/05_customer_rfm.csv) | 셀 05에서 고객별 집계를 마친 후 |
 | 요약표·6종 차트·해석 | [analysis_report.ipynb](notebooks/analysis_report.ipynb) | 각 셀 아래에 표시되며 노트북을 저장하면 함께 보관됩니다. |
 
-거래 CSV의 11열은 입력 8열에 사진 평균 `image_mean`, 사진 표준편차 `image_std`, 상품명 길이 `name_length`를 더한 것입니다. 계산 중인 표에는 `image_missing`, `amount_outlier`, `amount_iqr`도 있어 총 14열입니다. 셀 07은 이 메모리의 비교용 금액으로 박스플롯을 그리고, 고객별·월별 금액 합계에는 원본 `amount`를 사용합니다.
+거래 CSV의 11열은 입력 8열에 사진 평균 `image_mean`, 사진 표준편차 `image_std`, 상품명 길이 `name_length`를 더한 것입니다. 계산 중인 표에는 `image_missing`, `amount_outlier`, `amount_iqr`도 있어 총 14열입니다. 셀 06은 이 메모리의 비교용 금액으로 박스플롯을 그리고, 고객별·월별 금액 합계에는 원본 `amount`를 사용합니다.
 
 파일명의 `03`과 `05`는 분석 단계 번호입니다. 전체 실행을 반복하면 해당 셀에서 같은 이름의 CSV를 덮어씁니다.
 
 ## ▶️ 4. 내 컴퓨터에서 실행하기
 
-Python 3.12와 VS Code의 Microsoft Python·Jupyter 확장을 준비합니다. 클론한 프로젝트 폴더를 열고 `requirements.txt`가 보이는 위치에서 현재 운영체제에 맞는 명령을 실행하세요.
+Python 3.12와 VS Code의 Microsoft Python·Jupyter 확장을 준비하세요. VS Code에서 이 프로젝트 폴더를 열고, `README.md`와 `requirements.txt`가 있는 최상위 폴더에서 터미널을 엽니다.
 
-Windows PowerShell 또는 Git Bash
+### 새로 클론하거나 별도 폴더에 압축을 푼 경우
 
-```bash
-py -3.12 -m venv .venv
-./.venv/Scripts/python.exe -m pip install -r requirements.txt
-```
-
-macOS 터미널
+Windows Git Bash
 
 ```bash
-python3.12 -m venv .venv
-./.venv/bin/python3 -m pip install -r requirements.txt
+py -3.12 -m venv .venv &&
+source .venv/Scripts/activate &&
+python -m pip install -r requirements.txt
 ```
 
-macOS에서 `python3 --version`이 3.12.x라면 첫 줄에 `python3 -m venv .venv`를 사용해도 됩니다. 위 설치 명령은 프로젝트의 Python 경로를 직접 지정하므로 설치 위치가 명확합니다. 이 프로젝트의 `.venv`에 도구가 준비되어 있으면 다음 순서로 바로 실행하세요.
+아이맥 zsh
 
-1. VS Code에서 `notebooks/analysis_report.ipynb`를 열고 오른쪽 위 `Select Kernel` 또는 표시된 커널 이름을 누릅니다.
-2. 프로젝트의 `.venv`를 선택합니다. 목록에 보이지 않으면 `Select Another Kernel… → Python Environments…`로 들어갑니다.
-3. 셀 01을 실행합니다. ‘실행 중인 Python’ 경로가 이 프로젝트의 `.venv` 안이고 NumPy·Pandas 버전이 표시되면 준비된 것입니다.
-4. 전체 결과를 다시 만들 때는 `Restart Kernel → Run All`을 실행합니다. 셀 08에서 검증 완료를 확인하고 Windows에서는 `Ctrl+S`, macOS에서는 `Cmd+S`로 저장합니다.
+```bash
+python3.12 -m venv .venv &&
+source .venv/bin/activate &&
+python3 -m pip install -r requirements.txt
+```
 
-계산 과정을 더 보고 싶다면 `src/pipeline.py`에서 `DataAnalyzer`의 `load_data()`, `handle_missing_values()`, `detect_outliers()`, `calculate_rfm()`을 확인하세요. `src/reporting.py`는 이 결과로 표와 그래프를 만들고 마지막 검증을 수행합니다. 분석에는 NumPy·Pandas·Matplotlib·Seaborn을, 노트북 커널에는 IPyKernel을 사용합니다.
+아이맥에 `python3.12` 명령이 없다면 `python3 --version`을 먼저 확인하세요. 결과가 3.12.x이면 첫 줄의 `python3.12`를 `python3`로 바꿔 사용할 수 있습니다.
+
+### 기존 프로젝트에 덮어썼고 Python 3.12 가상환경이 있는 경우
+
+각 운영체제에 해당하는 설치 명령만 프로젝트 최상위 폴더에서 한 번 실행하세요.
+
+| 운영체제 | 기존 가상환경에 설치할 명령 |
+|---|---|
+| Windows Git Bash 또는 PowerShell | `./.venv/Scripts/python.exe -m pip install -r requirements.txt` |
+| 아이맥 zsh | `./.venv/bin/python3 -m pip install -r requirements.txt` |
+
+`requirements.txt`의 `-e .`는 현재 폴더의 분석 코드(`hnm_analysis`)를 가상환경에 연결합니다. 이 연결 덕분에 노트북은 실행 폴더를 탐색하는 코드 없이 `src`의 클래스를 바로 불러옵니다. 설치 후 같은 프로젝트와 가상환경을 계속 사용하면 다음 실행부터는 노트북을 바로 열 수 있습니다.
+
+### 커널 선택과 전체 실행
+
+1. VS Code에서 `notebooks/analysis_report.ipynb`를 엽니다. 오른쪽 위 `Select Kernel` 또는 현재 커널 이름을 누릅니다.
+2. 현재 프로젝트의 `.venv` (Python 3.12.x)를 선택합니다. 목록에 없으면 `Select Another Kernel… → Python Environments…`를 엽니다.
+3. `Restart Kernel → Run All`을 실행합니다. 셀 01에서 거래 첫 5행이 표시되고, 셀 07에 검증 완료 메시지가 나타나면 끝난 것입니다.
+4. Windows에서는 `Ctrl+S`, macOS에서는 `Cmd+S`로 노트북과 출력을 함께 저장합니다.
+
+터미널에서 설치 환경을 확인하고 싶다면 가상환경을 활성화한 뒤 `python -c "import sys, hnm_analysis; print(sys.executable); print(hnm_analysis.__file__)"`을 실행하세요. 두 경로는 각각 현재 프로젝트의 가상환경과 `src` 폴더를 가리킵니다.
+
+계산 과정은 [src/pipeline.py](src/pipeline.py)의 `DataAnalyzer`에서, 차트·해석·최종 검증은 [src/reporting.py](src/reporting.py)의 `AnalysisReport`에서 확인할 수 있습니다. 분석에는 NumPy·Pandas·Matplotlib·Seaborn을, 노트북 커널에는 IPyKernel을 사용합니다.
 
 ## 📊 5. 분석 결과와 비즈니스 제안
 
-셀 08은 다음 영역을 계산 결과로 갱신합니다. 각 제안에는 관찰한 수치, 적용할 고객과 방법, 효과를 확인할 때 필요한 데이터가 담겨 있습니다. 직접 작성할 메모는 자동 갱신 영역 밖에 두세요.
+셀 07은 다음 영역을 계산 결과로 갱신합니다. 각 제안에는 관찰한 수치, 적용할 고객과 방법, 효과를 확인할 때 필요한 데이터가 담겨 있습니다. 직접 작성할 메모는 자동 갱신 영역 밖에 두세요.
 
 <!-- ANALYSIS_RESULTS_START -->
 

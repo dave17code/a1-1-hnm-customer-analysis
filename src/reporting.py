@@ -11,15 +11,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from IPython.display import display, Markdown
 
+from .pipeline import AnalysisOutputs
+
 
 class AnalysisReport:
-    def __init__(self, analyzer, root, outputs):
+    def __init__(self, analyzer, root=None, outputs=None):
         self.analyzer = analyzer
-        self.root = Path(root)
-        self.outputs = outputs
+        self.root = Path(root) if root is not None else analyzer.data_path
+        self.outputs = outputs if outputs is not None else AnalysisOutputs(self.root / "outputs")
         self.shown_charts = set()
         self.correlation = None
         self.monthly = None
+        self.segment_colors = dict(zip(analyzer.SEGMENTS, sns.color_palette("colorblind", len(analyzer.SEGMENTS))))
         sns.set_theme(style="whitegrid", context="notebook")
         plt.rcParams.update({"figure.dpi": 110, "font.size": 10})
 
@@ -27,20 +30,22 @@ class AnalysisReport:
     def _notes(observation, implication):
         display(Markdown(f"**관찰:** {observation}\n\n**의미:** {implication}"))
 
-    def overview(self):
+    def show_transaction_overview(self, transactions=None):
         a = self.analyzer
-        preview = a.df.head().copy()
+        if transactions is None:
+            transactions = a.df
+        preview = transactions.head().copy()
         preview["customer_id"] = preview.customer_id.str[:8] + "…"
         display(preview)
-        a.df.info()
-        display(a.df[["amount"]].describe().round(4))
+        transactions.info()
+        display(transactions[["amount"]].describe().round(4))
         self._notes(
-            f"입력은 **{len(a.df):,}행 × {a.df.shape[1]}컬럼**, 고객 **{len(a.customers):,}명**, "
-            f"상품 **{len(a.articles):,}개**, 상품 종류 **{a.df.product_type_name.nunique():,}개**이며 기간은 **{a.meta['window_start']}~{a.meta['reference_date']}**입니다.",
+            f"입력은 **{len(transactions):,}행 × {transactions.shape[1]}컬럼**, 고객 **{transactions.customer_id.nunique():,}명**, "
+            f"상품 **{transactions.article_id.nunique():,}개**, 상품 종류 **{transactions.product_type_name.nunique():,}개**이며 기간은 **{a.meta['window_start']}~{a.meta['reference_date']}**입니다.",
             "고객·상품이 이미 결합된 표입니다. 고객 나이는 고객별 한 번, 상품 특성은 상품별 한 번 집계하여 "
             "구매가 많은 대상이 통계에 반복 반영되지 않게 합니다. 상품 종류는 범주형 자료로 확인하며 금액은 제공 단위입니다.")
 
-    def features(self):
+    def show_imputed_ages_and_product_features(self):
         a = self.analyzer
         changes = a.age_imputation.copy()
         changes["customer_id"] = changes.customer_id.str[:8] + "…"
@@ -54,8 +59,12 @@ class AnalysisReport:
             "대치한 나이는 추정값입니다. 사진 없는 상품의 거래는 유지하고 이미지 특성만 NaN으로 남깁니다. "
             "이미지 숫자에는 배경·조명도 포함되므로 상품 품질이나 고객 선호를 뜻하지 않습니다.")
 
-    def outliers(self):
-        a, out = self.analyzer, self.analyzer.outlier_report
+    def show_amount_outliers(self, outlier_transactions=None):
+        a = self.analyzer
+        out = a.outlier_report.copy()
+        if outlier_transactions is not None:
+            out["count"] = len(outlier_transactions)
+            out["rate"] = len(outlier_transactions) / len(a.df)
         display(pd.DataFrame([out]).round(6))
         self._notes(
             f"Q1={out['q1']:.4f}, Q3={out['q3']:.4f}, IQR={out['iqr']:.4f}이고 경계는 "
@@ -65,7 +74,7 @@ class AnalysisReport:
         print(f"전체 가공 거래표 저장: outputs/03_cleaned_transactions.csv "
               f"({len(a.df):,}행 × {len(self.outputs.TRANSACTION_COLUMNS)}컬럼)")
 
-    def statistics(self, stats):
+    def show_summary_statistics(self, stats):
         display(stats.round(4))
         amount = stats["amount / transaction"]
         self._notes(
@@ -75,7 +84,7 @@ class AnalysisReport:
             "중심과 퍼짐을 함께 보면 평균만으로 놓치는 거래금액 차이를 읽을 수 있습니다. 나이 통계에는 대치값이 포함됩니다. "
             "표의 이미지 통계는 상품별로 계산한 이미지 평균·표준편차를 다시 요약한 것입니다.")
 
-    def rfm_summary(self, segments):
+    def show_customer_segments(self, segments):
         a = self.analyzer
         display(segments[["customers", "customer_pct", "mean_recency_days", "mean_purchase_days", "mean_monetary", "monetary_pct"]].round(2))
         self._notes(
@@ -93,10 +102,13 @@ class AnalysisReport:
         self.shown_charts.update(chart_ids)
 
     def charts(self):
-        a, df = self.analyzer, self.analyzer.df
-        rfm, segments = a.rfm, a.segment_summary()
-        palette = dict(zip(a.SEGMENTS, sns.color_palette("colorblind", len(a.SEGMENTS))))
         self.shown_charts.clear()
+        self.plot_amount_distribution_and_outliers()
+        self.plot_segments_and_rank_correlations()
+        self.plot_purchase_days_and_monthly_spend()
+
+    def plot_amount_distribution_and_outliers(self):
+        a, df = self.analyzer, self.analyzer.df
 
         fig, axes = plt.subplots(1, 2, figsize=(13, 4.5))
         sns.histplot(data=df, x="amount", bins=30, ax=axes[0], color="#4477AA")
@@ -119,7 +131,7 @@ class AnalysisReport:
 
 #### ② 오른쪽 박스플롯 · 금액이 큰 거래를 경계값으로 제한하면 무엇이 달라질까요?
 
-아래쪽에 납작하게 색칠된 직사각형이 상자입니다. 왼쪽 `Original`은 원본 거래금액, 오른쪽 `IQR clipped`는 셀 04에서 만든 비교용 금액입니다.
+아래쪽에 납작하게 색칠된 직사각형이 상자입니다. 왼쪽 `Original`은 원본 거래금액, 오른쪽 `IQR clipped`는 셀 03에서 만든 비교용 금액입니다.
 
 | 그림에서 볼 부분 | 읽는 방법 |
 |---|---|
@@ -129,13 +141,17 @@ class AnalysisReport:
 | 원본 상자에서 위로 뻗은 선(수염)의 끝 | 위쪽 경계를 넘지 않은 관측값 중 가장 큰 값({upper_whisker:.5f})입니다. |
 | 원본 상자 위에 따로 찍힌 동그라미 | 위쪽 경계({upper:.5f})를 넘은 거래입니다. 금액이 같거나 비슷하면 점이 겹쳐 보입니다. |
 
-셀 04에서 위쪽 경계를 넘은 {above:,}건의 비교용 금액을 경계까지 낮췄습니다. 가장 큰 거래 한 건을 따라가면 원본 `amount`는 {df.amount.max():.5f}, 비교용 `amount_iqr`는 {df.amount_iqr.max():.5f}입니다. 그래서 오른쪽에서는 위쪽 점들이 사라지고 두 상자의 가운데 부분은 거의 같은 높이에 남습니다. 양쪽 모두 {len(df):,}건입니다. 고객별·월별 구매금액은 원본을 더합니다."""))
+셀 03에서 위쪽 경계를 넘은 {above:,}건의 비교용 금액을 경계까지 낮췄습니다. 가장 큰 거래 한 건을 따라가면 원본 `amount`는 {df.amount.max():.5f}, 비교용 `amount_iqr`는 {df.amount_iqr.max():.5f}입니다. 그래서 오른쪽에서는 위쪽 점들이 사라지고 두 상자의 가운데 부분은 거의 같은 높이에 남습니다. 양쪽 모두 {len(df):,}건입니다. 고객별·월별 구매금액은 원본을 더합니다."""))
 
+    def plot_segments_and_rank_correlations(self):
+        a = self.analyzer
+        df, rfm = a.df, a.rfm
+        segments = a.segment_summary()
         # 스피어만 계수는 각 지표의 순위 사이의 상관계수입니다. 동점은 평균 순위를 씁니다.
         rfm_ranks = rfm[["Recency", "Frequency", "Monetary"]].rank(method="average", ascending=False)
         self.correlation = rfm_ranks.corr()
         fig, axes = plt.subplots(1, 2, figsize=(13, 4.8))
-        bars = axes[0].bar(segments.index, segments.customers, color=[palette[s] for s in segments.index])
+        bars = axes[0].bar(segments.index, segments.customers, color=[self.segment_colors[s] for s in segments.index])
         axes[0].bar_label(bars, padding=3)
         axes[0].margins(y=0.15)
         axes[0].tick_params(axis="x", labelrotation=12)
@@ -156,7 +172,6 @@ class AnalysisReport:
         rm = f"{self.correlation.loc['Recency', 'Monetary']:+.2f}".replace("-", "−")
         fm = f"{self.correlation.loc['Frequency', 'Monetary']:+.2f}".replace("-", "−")
         first_id = df.customer_id.iloc[0]
-        example = rfm.loc[first_id]
         example_ranks = rfm_ranks.loc[first_id]
         display(Markdown(f"""#### ③ 왼쪽 막대그래프 · 각 그룹에는 고객이 몇 명 있을까요?
 
@@ -178,7 +193,7 @@ class AnalysisReport:
 | R과 M | `{rm}` | 마지막 구매 후 지난 일수가 많은 고객일수록, 관찰기간의 누적 구매금액도 대체로 작았습니다. |
 | F와 M | `{fm}` | 여러 날에 걸쳐 구매한 고객일수록, 누적 구매금액도 대체로 컸습니다. |
 
-예를 들어 셀 02의 첫 고객은 구매일 수 `{example_ranks.Frequency:g}위`, 누적 구매금액 `{example_ranks.Monetary:g}위`로 두 기준 모두 상위권입니다. `{fm}`은 이런 순위의 일치가 고객 전체에서 비교적 뚜렷했다는 뜻입니다. 이 숫자만으로는 구매일이 하루 늘 때 지출이 얼마나 늘어나는지, 구매일 수가 지출 증가의 원인인지까지는 알 수 없습니다.
+예를 들어 셀 01의 첫 고객은 구매일 수 `{example_ranks.Frequency:g}위`, 누적 구매금액 `{example_ranks.Monetary:g}위`로 두 기준 모두 상위권입니다. `{fm}`은 이런 순위의 일치가 고객 전체에서 비교적 뚜렷했다는 뜻입니다. 이 숫자만으로는 구매일이 하루 늘 때 지출이 얼마나 늘어나는지, 구매일 수가 지출 증가의 원인인지까지는 알 수 없습니다.
 
 🔍 스피어만 상관계수의 부호는 “한 지표의 값이 큰 고객들은 다른 지표에서도 값이 큰 편인가, 작은 편인가?”를 알려줍니다.
 
@@ -191,6 +206,9 @@ class AnalysisReport:
 
 부호가 관계의 방향을 알려준다면, `0`에서 얼마나 떨어져 있는지는 그 경향이 얼마나 뚜렷한지를 알려줍니다. `+1`에 가까우면 두 순위가 비슷하게 정렬되고, `−1`에 가까우면 반대 순서로 정렬됩니다. `0`에 가까우면 어느 한 방향의 순위 경향도 뚜렷하지 않습니다."""))
 
+    def plot_purchase_days_and_monthly_spend(self):
+        a = self.analyzer
+        df, rfm = a.df, a.rfm
         start, end = pd.Timestamp(a.meta["window_start"]), pd.Timestamp(a.meta["reference_date"])
         months = pd.period_range(start, end, freq="M")
         self.monthly = df.groupby(df.order_date.dt.to_period("M")).amount.sum().reindex(months, fill_value=0)
@@ -201,13 +219,15 @@ class AnalysisReport:
         month_table["is_partial"] = [p.start_time < start or p.end_time.normalize() > end for p in months]
         labels = [str(p) + ("\n(partial)" if partial else "") for p, partial in zip(months, month_table.is_partial)]
         fig, axes = plt.subplots(1, 2, figsize=(13, 4.8))
-        sns.scatterplot(data=rfm, x="Frequency", y="Monetary", hue="segment", palette=palette, alpha=.65, s=30, ax=axes[0])
+        sns.scatterplot(data=rfm, x="Frequency", y="Monetary", hue="segment", palette=self.segment_colors, alpha=.65, s=30, ax=axes[0])
         axes[0].set(title="5. Purchase days and total spend", xlabel="Distinct purchase days", ylabel="Total spend (provided units)")
         axes[0].legend(title="Segment", fontsize=8)
         axes[1].plot(labels, self.monthly.to_numpy(), marker="o", color="#4477AA")
         axes[1].tick_params(axis="x", labelsize=8)
         axes[1].set(title="6. Monthly spend of sampled customers", xlabel="Month in observation window", ylabel="Total spend (provided units)")
         self._show(fig, {5, 6})
+        first_id = df.customer_id.iloc[0]
+        example = rfm.loc[first_id]
         purchases = df.customer_id.eq(first_id).sum()
         fewest_days = rfm.Frequency.min()
         same_days = rfm.loc[rfm.Frequency.eq(fewest_days), "Monetary"]
@@ -216,9 +236,9 @@ class AnalysisReport:
         partial_text = ", ".join(f"{month.month}월 {days}일치" for month, days in partial_months.items())
         display(Markdown(f"""#### ⑤ 왼쪽 산점도 · 구매한 날짜 수가 같으면 지출도 비슷할까요?
 
-점 하나가 고객 한 명입니다. 오른쪽으로 갈수록 구매한 날짜가 많고 위로 갈수록 누적 구매금액이 큽니다. 색은 셀 06에서 배정한 그룹을 나타냅니다.
+점 하나가 고객 한 명입니다. 오른쪽으로 갈수록 구매한 날짜가 많고 위로 갈수록 누적 구매금액이 큽니다. 색은 셀 05에서 배정한 그룹을 나타냅니다.
 
-셀 02의 첫 고객을 이 그림에 찍으면 가로 {example.Frequency}일, 세로 약 {example.Monetary:.2f}입니다. 이 고객의 거래는 {purchases:,}행이지만 같은 날 여러 상품을 산 기록을 하루로 세기 때문에 가로 위치는 {example.Frequency}입니다.
+셀 01의 첫 고객을 이 그림에 찍으면 가로 {example.Frequency}일, 세로 약 {example.Monetary:.2f}입니다. 이 고객의 거래는 {purchases:,}행이지만 같은 날 여러 상품을 산 기록을 하루로 세기 때문에 가로 위치는 {example.Frequency}입니다.
 
 가로축 `{fewest_days}`에서 점들이 세로로 늘어선 부분을 보세요. 이 위치에 있는 {len(same_days):,}명은 똑같이 {fewest_days}일 구매했지만, 구매금액은 {same_days.min():.4f}에서 {same_days.max():.4f}까지 퍼져 있습니다. 이 산점도는 실제 일수와 금액으로 그리기 때문에, 같은 일수만큼 구매한 사람들 사이의 지출 차이까지 보입니다.
 
@@ -231,7 +251,7 @@ class AnalysisReport:
 ##### 월별 구매금액 집계표"""))
         display(month_table.round(4))
 
-    def _validate(self):
+    def validate_results(self):
         a, df, rfm = self.analyzer, self.analyzer.df, self.analyzer.rfm
         assert a.base_shape[0] >= 1000 and a.base_shape[1] >= 8
         assert {"customer_id", "order_date", "amount"}.issubset(df.columns)
@@ -253,9 +273,13 @@ class AnalysisReport:
         assert np.isfinite(self.correlation.to_numpy()).all()
         assert self.shown_charts == {1, 2, 3, 4, 5, 6}
         self.outputs.complete()
+        print("검증 완료 · 거래·원본 금액 보존, 고객·상품 분석 단위, RFM 합계, 결측치 대치, 6종 차트, 상세 CSV 2개, 거래 CSV 11컬럼")
 
     def finish(self):
-        self._validate()
+        self.validate_results()
+        self.write_business_insights_to_readme()
+
+    def write_business_insights_to_readme(self):
         a, segments = self.analyzer, self.analyzer.segment_summary()
         actions = {
             "VIP": ("VIP 고객 유지", "VIP에게 우선 구매·멤버십 혜택을 제공하여 재구매 유지율 향상을 기대합니다.",
@@ -302,6 +326,12 @@ class AnalysisReport:
             temporary.replace(readme)
         finally:
             temporary.unlink(missing_ok=True)
-        display(Markdown(results))
-        print("검증 완료: 거래·원본 금액 보존, 고객·상품 분석 단위, RFM 합계, 결측치 대치, 6종 차트, 상세 CSV 2개, 거래 CSV 11컬럼")
+        display(Markdown(results.replace("(notebooks/analysis_report.ipynb)", "(analysis_report.ipynb)")))
         print("README 분석 결과 갱신 완료. 노트북을 Windows Ctrl+S / Mac Cmd+S로 저장하세요.")
+
+    # 기존 노트북에서 사용하던 공개 메서드 이름도 같은 구현으로 연결합니다.
+    overview = show_transaction_overview
+    features = show_imputed_ages_and_product_features
+    outliers = show_amount_outliers
+    statistics = show_summary_statistics
+    rfm_summary = show_customer_segments

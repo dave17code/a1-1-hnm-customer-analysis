@@ -5,3 +5,5 @@ matplotlib==3.10.8
 seaborn==0.13.2
 # VS Code notebook kernel
 ipykernel>=6.29,<8
+# Import this project's src modules from either the root or notebooks directory
+-e .

@@ -19,6 +19,7 @@ class DataAnalyzer:
                           else Path(__file__).resolve().parents[1])
         self.df = None
         self.customers = None
+        self._customers_before_imputation = None
         self.articles = None
         self.image_features = None
         self.rfm = None
@@ -70,6 +71,7 @@ class DataAnalyzer:
         if articles.article_id.duplicated().any():
             raise ValueError("같은 상품 ID에 서로 다른 상품 정보가 있습니다. 결측 여부도 확인하세요.")
         self.customers = customers.reset_index(drop=True)
+        self._customers_before_imputation = self.customers.copy()
         self.articles = articles.reset_index(drop=True)
         self.df = frame
         self.df["product_type_name"] = self.df.product_type_name.astype("category")
@@ -95,7 +97,8 @@ class DataAnalyzer:
         """고객별 한 행에서 그룹 통계를 계산해 구매 빈도에 의한 가중을 방지합니다."""
         if strategy not in {"group_median", "group_mean"}:
             raise ValueError("strategy는 group_median 또는 group_mean입니다.")
-        customers = self.customers.copy()
+        # 셀을 다시 실행하거나 대치 전략을 바꾸어도 처음 관측한 나이에서 출발합니다.
+        customers = self._customers_before_imputation.copy()
         customers[column] = pd.to_numeric(customers[column], errors="raise")
         missing_rows = customers[column].isna()
         self.age_imputation = customers.loc[missing_rows, ["customer_id", group_col, column]].copy()
@@ -116,7 +119,7 @@ class DataAnalyzer:
         self.df[group_col] = self.df.customer_id.map(lookup[group_col]).astype("category")
         return self.df
 
-    def engineer_features(self):
+    def add_image_and_name_features(self):
         """이미지별 픽셀 통계는 for/apply 없이 배열의 축을 한 번에 축약합니다."""
         self.image_features = pd.DataFrame({
             "article_id": self.image_ids,
@@ -129,6 +132,8 @@ class DataAnalyzer:
         # 상품명 결측치를 길이 0인 실제 상품명으로 오해하지 않도록 nullable 정수로 유지합니다.
         self.df["name_length"] = self.df.prod_name.astype("string").str.len()
         return self.df
+
+    engineer_features = add_image_and_name_features
 
     def detect_outliers(self, column="amount", threshold=1.5, treatment="clip"):
         """Q1-k*IQR, Q3+k*IQR를 직접 계산합니다. 원본 컬럼은 보존합니다."""

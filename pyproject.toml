@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hnm-analysis"
+version = "0.1.0"
+description = "H&M sample transaction analysis for the A1-1 notebook"
+requires-python = ">=3.12"
+
+[tool.setuptools]
+packages = ["hnm_analysis"]
+package-dir = {hnm_analysis = "src"}
